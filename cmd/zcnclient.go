@@ -256,7 +256,6 @@ func (c *ZcnClient) putMultipleObject(
 	}
 	if resp != nil {
 		if resp.StatusCode != http.StatusOK {
-			fmt.Println("failure error response with status code: ", resp.StatusCode)
 			return minio.UploadInfo{}, httpRespToErrorResponse(resp, bucketName, "")
 		}
 	}
@@ -509,11 +508,10 @@ func xmlDecodeAndBody(bodyReader io.Reader, v interface{}) ([]byte, error) {
 	// read the whole body (up to 1MB)
 	const maxBodyLength = 1 << 20
 	body, err := io.ReadAll(io.LimitReader(bodyReader, maxBodyLength))
-	fmt.Println("body: ", string(body))
-	fmt.Println("error: ", err.Error())
 	if err != nil {
 		return nil, err
 	}
+
 	return bytes.TrimSpace(body), xmlDecoder(bytes.NewReader(body), v)
 }
 

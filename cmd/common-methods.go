@@ -629,9 +629,11 @@ func uploadMultipleSourcesToTargetURL(ctx context.Context, allUrls []URLs, progr
 
 	formatError := func(err interface{}) URLs {
 		returningUrl := URLs{
-			TotalCount: int64(len(allUrls)),
-			TotalSize:  0,
-			Error:      nil,
+			TotalCount:    int64(len(allUrls)),
+			SourceContent: allUrls[0].SourceContent,
+			TargetContent: allUrls[0].TargetContent,
+			TotalSize:     0,
+			Error:         nil,
 		}
 
 		for _, s := range allUrls {
