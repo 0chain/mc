@@ -31,7 +31,7 @@ require (
 	github.com/prometheus/prom2json v1.3.3
 	github.com/rjeczalik/notify v0.9.3
 	github.com/rs/xid v1.5.0
-  github.com/shirou/gopsutil/v3 v3.23.7
+	github.com/shirou/gopsutil/v3 v3.23.7
 	github.com/tidwall/gjson v1.15.0
 	golang.org/x/crypto v0.11.0 // indirect
 	golang.org/x/net v0.12.0
