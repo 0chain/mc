@@ -270,22 +270,24 @@ func mainRemoveBucket(cliCtx *cli.Context) error {
 
 		// Check if the bucket contains any object, version or delete marker.
 		isEmpty := true
-		opts := ListOptions{
-			Recursive:         true,
-			ShowDir:           DirNone,
-			WithOlderVersions: true,
-			WithDeleteMarkers: true,
-		}
-
-		listCtx, listCancel := context.WithCancel(ctx)
-		for obj := range clnt.List(listCtx, opts) {
-			if obj.Err != nil {
-				continue
+		if !isForce {
+			opts := ListOptions{
+				Recursive:         true,
+				ShowDir:           DirNone,
+				WithOlderVersions: true,
+				WithDeleteMarkers: true,
 			}
-			isEmpty = false
-			break
+
+			listCtx, listCancel := context.WithCancel(ctx)
+			for obj := range clnt.List(listCtx, opts) {
+				if obj.Err != nil {
+					continue
+				}
+				isEmpty = false
+				break
+			}
+			listCancel()
 		}
-		listCancel()
 
 		// For all recursive operations make sure to check for 'force' flag.
 		if !isForce && !isEmpty {
