@@ -156,47 +156,49 @@ func deleteBucket(ctx context.Context, url string, isForce bool) *probe.Error {
 	if pErr != nil {
 		return pErr
 	}
-	contentCh := make(chan *ClientContent)
-	resultCh := clnt.Remove(ctx, false, false, false, false, contentCh)
+	if !isForce {
+		contentCh := make(chan *ClientContent)
+		resultCh := clnt.Remove(ctx, false, false, false, false, contentCh)
 
-	go func() {
-		defer close(contentCh)
-		opts := ListOptions{
-			Recursive:         true,
-			WithOlderVersions: true,
-			WithDeleteMarkers: true,
-			ShowDir:           DirLast,
-		}
-
-		for content := range clnt.List(ctx, opts) {
-			if content.Err != nil {
-				contentCh <- content
-				continue
+		go func() {
+			defer close(contentCh)
+			opts := ListOptions{
+				Recursive:         true,
+				WithOlderVersions: true,
+				WithDeleteMarkers: true,
+				ShowDir:           DirLast,
 			}
 
-			urlString := content.URL.Path
+			for content := range clnt.List(ctx, opts) {
+				if content.Err != nil {
+					contentCh <- content
+					continue
+				}
 
-			select {
-			case contentCh <- content:
-			case <-ctx.Done():
-				return
+				urlString := content.URL.Path
+
+				select {
+				case contentCh <- content:
+				case <-ctx.Done():
+					return
+				}
+
+				// list internally mimics recursive directory listing of object prefixes for s3 similar to FS.
+				// The rmMessage needs to be printed only for actual buckets being deleted and not objects.
+				tgt := strings.TrimPrefix(urlString, string(filepath.Separator))
+				if !strings.Contains(tgt, string(filepath.Separator)) && tgt != targetAlias {
+					printMsg(removeBucketMessage{
+						Bucket: targetAlias + urlString, Status: "success",
+					})
+				}
 			}
+		}()
 
-			// list internally mimics recursive directory listing of object prefixes for s3 similar to FS.
-			// The rmMessage needs to be printed only for actual buckets being deleted and not objects.
-			tgt := strings.TrimPrefix(urlString, string(filepath.Separator))
-			if !strings.Contains(tgt, string(filepath.Separator)) && tgt != targetAlias {
-				printMsg(removeBucketMessage{
-					Bucket: targetAlias + urlString, Status: "success",
-				})
+		// Give up on the first error.
+		for result := range resultCh {
+			if result.Err != nil {
+				return result.Err.Trace(url)
 			}
-		}
-	}()
-
-	// Give up on the first error.
-	for result := range resultCh {
-		if result.Err != nil {
-			return result.Err.Trace(url)
 		}
 	}
 	// Return early if prefix delete
@@ -268,22 +270,24 @@ func mainRemoveBucket(cliCtx *cli.Context) error {
 
 		// Check if the bucket contains any object, version or delete marker.
 		isEmpty := true
-		opts := ListOptions{
-			Recursive:         true,
-			ShowDir:           DirNone,
-			WithOlderVersions: true,
-			WithDeleteMarkers: true,
-		}
-
-		listCtx, listCancel := context.WithCancel(ctx)
-		for obj := range clnt.List(listCtx, opts) {
-			if obj.Err != nil {
-				continue
+		if !isForce {
+			opts := ListOptions{
+				Recursive:         true,
+				ShowDir:           DirNone,
+				WithOlderVersions: true,
+				WithDeleteMarkers: true,
 			}
-			isEmpty = false
-			break
+
+			listCtx, listCancel := context.WithCancel(ctx)
+			for obj := range clnt.List(listCtx, opts) {
+				if obj.Err != nil {
+					continue
+				}
+				isEmpty = false
+				break
+			}
+			listCancel()
 		}
-		listCancel()
 
 		// For all recursive operations make sure to check for 'force' flag.
 		if !isForce && !isEmpty {
